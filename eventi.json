@@ -1,0 +1,12 @@
+{
+  "eventi": [
+    { "id": 1, "ora": 23.5, "giorniFa": 6, "luogo": "casa",          "attivita": "social"   },
+    { "id": 2, "ora": 1.0,  "giorniFa": 5, "luogo": "casa",          "attivita": "video"    },
+    { "id": 3, "ora": 8.5,  "giorniFa": 5, "luogo": "viaggio",       "attivita": "mappe"    },
+    { "id": 4, "ora": 13.0, "giorniFa": 4, "luogo": "scuola_lavoro", "attivita": "ricerca"  },
+    { "id": 5, "ora": 0.5,  "giorniFa": 3, "luogo": "casa",          "attivita": "social"   },
+    { "id": 6, "ora": 18.0, "giorniFa": 2, "luogo": "locale",        "attivita": "messaggi" },
+    { "id": 7, "ora": 2.5,  "giorniFa": 1, "luogo": "casa",          "attivita": "social"   },
+    { "id": 8, "ora": 23.5, "giorniFa": 0, "luogo": "casa",          "attivita": "social"   }
+  ]
+}

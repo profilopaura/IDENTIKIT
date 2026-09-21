@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="it">
+  <title>IDENTIKIT</title>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IDENTIKIT — Image as infrastructure</title>
+<meta name="description" content="Ritratto di un'identità digitale visto da due punti di vista: quello di chi lo vive e quello di un sistema di profilazione. Progetto per il tema Image as infrastructure.">
+<style>
+  :root {
+    --sans: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --segnale: #39ff14;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+
+  body {
+    font-family: var(--sans); font-size: 16px; line-height: 1.5;
+    color: var(--fg); transition: color .5s;
+  }
+  body.umana {
+    --fg: #263042; --fg2: rgba(38,48,66,.72); --linea: rgba(38,48,66,.20);
+    --vetro: rgba(38,48,66,.05); --pannello: #f8f9fc; --velo: rgba(38,48,66,.32);
+    --primario-bg: #263042; --primario-fg: #f4f6fa; --segnale-testo: #263042;
+  }
+  body.macchina {
+    font-family: var(--mono);
+    --fg: #8cff7a; --fg2: rgba(140,255,122,.74); --linea: rgba(57,255,20,.30);
+    --vetro: rgba(57,255,20,.07); --pannello: #060d08; --velo: rgba(0,0,0,.74);
+    --primario-bg: #39ff14; --primario-fg: #031006; --segnale-testo: #39ff14;
+  }
+
+  /*  sfondi  */
+  .sfondo, .griglia { position: fixed; inset: 0; z-index: 0; transition: opacity .6s; }
+  .griglia { pointer-events: none; }
+  #sfondo-umano {
+    background: radial-gradient(ellipse 75% 65% at 50% 46%, #f8f9fc 0%, #edeff5 58%, #dfe3ec 100%);
+  }
+  #sfondo-macchina {
+    background-color: #040805;
+    background-image:
+      linear-gradient(rgba(57,255,20,.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(57,255,20,.055) 1px, transparent 1px),
+      radial-gradient(ellipse 75% 65% at 50% 46%, #0b1a0e 0%, #050a06 60%, #010302 100%);
+    background-size: 32px 32px, 32px 32px, auto;
+  }
+  body.umana #sfondo-macchina, body.umana #griglia-macchina { opacity: 0; }
+  body.macchina #sfondo-umano, body.macchina #griglia-umana { opacity: 0; }
+
+  /*  scena: Cables (iframe) oppure anteprima 2D  */
+  #scena { position: fixed; inset: 0; z-index: 1; }
+  #cables { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+  #anteprima { position: absolute; inset: 0; }
+
+  /*  overlay della vista macchina  */
+  #overlay { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .4s; }
+  body.macchina #overlay { opacity: 1; }
+  .riquadro {
+    position: absolute; border: 1px solid var(--segnale);
+    box-shadow: 0 0 8px rgba(57,255,20,.35), inset 0 0 8px rgba(57,255,20,.10);
+    opacity: 0; transition: opacity .35s calc(var(--i, 0) * .18s + .2s);
+  }
+  body.macchina .riquadro { opacity: 1; }
+  body.umana .riquadro { transition-delay: 0s; }
+  .codice {
+    position: absolute; left: -1px; bottom: 100%;
+    padding: 1px 5px; font: 700 11px/1.35 var(--mono); white-space: nowrap;
+    color: #020604; background: #39ff14;
+  }
+  #riepilogo .legenda { margin-bottom: 10px; }
+  #riepilogo .legenda p { display: flex; gap: .7em; align-items: baseline; }
+  #riepilogo .cod {
+    flex: none; min-width: 1.6em; padding: 0 5px; text-align: center;
+    font-weight: 700; color: #020604; background: #39ff14;
+  }
+
+  /*  intestazione e comandi  */
+  #topbar {
+    position: fixed; z-index: 3; left: 0; right: 0;
+    top: calc(env(safe-area-inset-top, 0px) + 24px); padding: 0 28px;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px 24px; flex-wrap: wrap;
+    pointer-events: none;
+  }
+  #titolo { max-width: 40ch; }
+  #titolo-testo {
+    margin: 0 0 .3em; font-family: var(--serif); font-size: 1.65rem; font-weight: 400;
+    letter-spacing: -.01em; line-height: 1.15;
+  }
+  body.macchina #titolo-testo { font-family: var(--mono); font-weight: 700; font-size: 1.2rem; letter-spacing: 0; }
+  #titolo-sub { margin: 0; font-size: .9rem; line-height: 1.45; color: var(--fg2); }
+
+  #vista {
+    display: inline-flex; pointer-events: auto;
+    border: 1px solid var(--linea); border-radius: 8px; overflow: hidden;
+  }
+  #vista button {
+    font: inherit; font-size: .9rem; color: var(--fg); cursor: pointer;
+    background: transparent; border: 0; padding: .6em 1.15em;
+    transition: background .2s, color .3s;
+  }
+  #vista button + button { border-left: 1px solid var(--linea); }
+  #vista button:hover { background: var(--vetro); }
+  #vista button[aria-pressed="true"] { background: var(--primario-bg); color: var(--primario-fg); }
+
+  #azioni {
+    position: fixed; z-index: 3; left: 28px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .btn {
+    font: inherit; font-size: .9rem; color: var(--fg); cursor: pointer;
+    background: transparent; border: 1px solid var(--linea); border-radius: 6px;
+    padding: .55em 1em; transition: background .2s, border-color .2s, color .3s;
+  }
+  .btn:hover { background: var(--vetro); border-color: var(--fg2); }
+  #vista button:focus-visible, .btn:focus-visible, .riga select:focus-visible, .form-bottoni button:focus-visible {
+    outline: 2px solid var(--fg); outline-offset: 2px;
+  }
+
+  #riepilogo {
+    position: fixed; z-index: 3; left: 28px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+    max-width: 46ch; font: 12px/1.65 var(--mono); color: var(--fg);
+    opacity: 0; transition: opacity .5s .9s; pointer-events: none;
+  }
+  body.macchina #riepilogo { opacity: 1; }
+  body.umana #riepilogo { transition-delay: 0s; }
+  #riepilogo p { margin: 0; }
+  #riepilogo b { font-weight: 700; color: var(--segnale-testo); }
+
+  #firma {
+    position: fixed; z-index: 3; right: 28px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+    font: 12px var(--mono); letter-spacing: .06em; color: var(--fg2);
+  }
+
+  #stato {
+    position: fixed; z-index: 6; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    max-width: min(60ch, 90vw); padding: 1em 1.2em;
+    font: 14px/1.5 var(--mono); color: #fff;
+    background: rgba(20,20,20,.94); border: 1px solid #ff6b6b;
+  }
+
+  /*  pannelli: form dei dati e descrizione  */
+  #form-dati {
+    position: fixed; inset: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: var(--velo);
+  }
+  .form-corpo {
+    width: min(780px, 100%); max-height: 100%; overflow: auto;
+    padding: 30px 30px 26px; color: var(--fg);
+    background: var(--pannello); border: 1px solid var(--linea); border-radius: 10px;
+  }
+  #form-titolo, #info-titolo {
+    margin: 0 0 .35em; font-family: var(--serif); font-size: 1.5rem; font-weight: 400; line-height: 1.2;
+  }
+  body.macchina #form-titolo, body.macchina #info-titolo { font-family: var(--mono); font-weight: 700; font-size: 1.2rem; }
+  .form-sub { margin: 0 0 22px; max-width: 60ch; font-size: .95rem; line-height: 1.5; color: var(--fg2); }
+  .intest, .riga { display: grid; grid-template-columns: 1.1fr .8fr 1.3fr 1.1fr 64px; gap: 8px; align-items: center; }
+  .intest { margin-bottom: 6px; font-size: .8rem; color: var(--fg2); }
+  .riga { margin-bottom: 8px; }
+  .riga select {
+    width: 100%; min-width: 0; padding: .55em .6em;
+    font: inherit; font-size: .95rem; color: var(--fg);
+    background: var(--vetro); border: 1px solid var(--linea); border-radius: 6px;
+  }
+  body.umana .riga select { color-scheme: light; }
+  body.macchina .riga select { color-scheme: dark; }
+  .riga select option { background: var(--pannello); color: var(--fg); }
+  .togli, .form-bottoni button {
+    font: inherit; font-size: .9rem; color: var(--fg); cursor: pointer;
+    background: transparent; border: 1px solid var(--linea); border-radius: 6px; padding: .5em .8em;
+  }
+  .form-bottoni button { font-size: .95rem; padding: .65em 1.2em; }
+  .form-bottoni .primario { background: var(--primario-bg); color: var(--primario-fg); border-color: var(--primario-bg); }
+  .togli:disabled, .form-bottoni button:disabled { opacity: .35; cursor: not-allowed; }
+  .form-azioni { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+  .form-bottoni { display: flex; gap: 10px; flex-wrap: wrap; }
+  #form-conta { font-size: .85rem; color: var(--fg2); }
+
+  #info {
+    position: fixed; inset: 0; z-index: 5;
+    display: flex; justify-content: flex-end; background: var(--velo);
+  }
+  .info-corpo {
+    position: relative; width: min(600px, 100%); height: 100%; overflow: auto;
+    padding: 32px 34px 56px; color: var(--fg);
+    background: var(--pannello); border-left: 1px solid var(--linea);
+  }
+  .info-corpo .chiudi { position: absolute; top: 24px; right: 24px; }
+  .info-corpo h2 { max-width: 80%; }
+  .info-corpo h3 { margin: 2em 0 .5em; font-size: 1.02rem; font-weight: 600; line-height: 1.3; }
+  .info-corpo p, .info-corpo li { margin: 0 0 .8em; font-size: .95rem; line-height: 1.62; color: var(--fg2); }
+  .info-corpo .lead { font-family: var(--serif); font-size: 1.12rem; line-height: 1.5; color: var(--fg); }
+  body.macchina .info-corpo .lead { font-family: var(--mono); font-size: 1rem; }
+  .info-corpo ul { margin: .6em 0; padding-left: 1.15em; }
+  .info-corpo .voce { font-weight: 600; color: var(--fg); }
+  .info-corpo table { width: 100%; margin: .6em 0 1em; border-collapse: collapse; }
+  .info-corpo th, .info-corpo td {
+    padding: .55em .8em .55em 0; text-align: left; vertical-align: top;
+    font-size: .9rem; line-height: 1.5; border-bottom: 1px solid var(--linea);
+  }
+  .info-corpo th { width: 34%; font-weight: 600; color: var(--fg); }
+  .info-corpo td { color: var(--fg2); }
+  .info-corpo .nota { font-size: .85rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; }
+  }
+  @media (max-width: 640px) {
+    #topbar { padding: 0 16px; }
+    #titolo { max-width: none; }
+    #vista { width: 100%; }
+    #vista button { flex: 1; }
+    #azioni { left: 16px; right: 16px; }
+    #riepilogo { left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 72px); }
+    #firma { display: none; }
+    .form-corpo { padding: 22px 16px; }
+    .intest { display: none; }
+    .riga { grid-template-columns: 1fr 1fr; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--linea); }
+    .togli { grid-column: 1 / -1; justify-self: end; }
+    .info-corpo { padding: 24px 18px 48px; }
+    .info-corpo .chiudi { top: 16px; right: 16px; }
+  }
+</style>
+</head>
+<body class="umana">
+
+<div id="sfondo-umano" class="sfondo"></div>
+<div id="sfondo-macchina" class="sfondo"></div>
+<canvas id="griglia-umana" class="griglia" aria-hidden="true"></canvas>
+<canvas id="griglia-macchina" class="griglia" aria-hidden="true"></canvas>
+
+<main id="scena">
+  <iframe id="cables" title="Ritratto (patch Cables)" hidden></iframe>
+  <canvas id="anteprima" hidden></canvas>
+  <div id="overlay" aria-hidden="true"></div>
+</main>
+
+<div id="topbar">
+  <header id="titolo">
+    <h1 id="titolo-testo"></h1>
+    <p id="titolo-sub"></p>
+  </header>
+  <div id="vista" role="group" aria-label="Vista del ritratto">
+    <button id="vista-umana" type="button" aria-pressed="true">Vista umana</button>
+    <button id="vista-macchina" type="button" aria-pressed="false">Vista macchina</button>
+  </div>
+</div>
+
+<div id="riepilogo" aria-live="polite"></div>
+<div id="firma" aria-hidden="true"></div>
+
+<nav id="azioni" aria-label="Azioni">
+  <button id="apri-form" class="btn" type="button">Cambia i dati</button>
+  <button id="apri-info" class="btn" type="button">Sul progetto</button>
+</nav>
+
+<p id="stato" role="status" hidden></p>
+
+<section id="form-dati" role="dialog" aria-modal="true" aria-labelledby="form-titolo" hidden>
+  <div class="form-corpo">
+    <h2 id="form-titolo">Racconta la tua settimana</h2>
+    <p class="form-sub">Aggiungi da 5 a 8 momenti in cui hai usato il telefono o il computer. Ogni riga diventa una forma del tuo ritratto.</p>
+    <div class="intest" aria-hidden="true"><span>Giorno</span><span>Ora</span><span>Dove</span><span>Cosa facevi</span><span></span></div>
+    <div id="righe"></div>
+    <div class="form-azioni">
+      <span id="form-conta"></span>
+      <div class="form-bottoni">
+        <button type="button" id="aggiungi">Aggiungi un momento</button>
+        <button type="button" id="genera" class="primario">Genera il mio ritratto</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<aside id="info" role="dialog" aria-modal="true" aria-labelledby="info-titolo" hidden>
+  <div class="info-corpo">
+    <button id="chiudi-info" class="btn chiudi" type="button">Chiudi</button>
+    <h2 id="info-titolo">Progetto</h2>
+    <p class="lead">«L'immagine non è solo cosa mostra, ma cosa fa.» <br> Questo progetto parte da questa frase e prova a rendere visibile un'immagine che di solito non vediamo: il ritratto digitale che un sistema costruisce di noi a partire dalle tracce che lasciamo.</p>
+
+    <h3>Cosa fa</h3>
+    <p>Chi visita la pagina deve descrivere da 5 a 8 momenti della propria settimana: giorno, ora, luogo e attività. <br> Il sistema li trasforma in un ritratto astratto in cui ogni informazione è una forma, e lo mostra in due modi. <br> La vista umana lo restituisce come lo vivrebbe chi lo ha prodotto, la vista della macchina lo mostra come lo legge un sistema di profilazione, con riquadri, etichette e un livello di confidenza.</p>
+
+    <h3>Come si legge</h3>
+    <table>
+      <tbody id="info-tabella"></tbody>
+    </table>
+    <p class="nota">Oltre ai momenti inseriti, il browser fornisce da solo altri dati, senza chiedere nulla. Il sistema sapeva già qualcosa di chi guarda, e lo usa per costruire la cornice del ritratto.</p>
+
+    <h3>Scopo del progetto</h3>
+    <p>Il lavoro unisce una logica computazionale, data-driven e generativa, a un punto di vista personale, quello autobiografico. <br> Non usa immagini: costruisce un modo di farle esistere e operare.</p>
+    <ul>
+      <li><span class="voce">Infrastruttura politica e di controllo.</span> La vista della macchina mostra il layer di controllo sopra l'immagine: etichette e confidenza, come farebbe un sistema di classificazione.</li>
+      <li><span class="voce">Infrastruttura economica.</span> Il profilo "target pubblicitario" tratta l'immagine come un asset che lavora: le abitudini diventano engagement e targeting.</li>
+      <li><span class="voce">Infrastruttura tecnica.</span> Ciò che vedi dipende dalla logistica dell'immagine: core, schermo e fuso orario del dispositivo cambiano la cornice, quindi la stessa settimana produce ritratti diversi su macchine diverse.</li>
+      <li><span class="voce">Infrastruttura di navigazione.</span> Passare da una vista all'altra è il percorso, e cambia il significato di ogni forma.</li>
+    </ul>
+
+    <h3>Errori e restrizioni</h3>
+    <p>Il brief chiede di far sentire l'infrastruttura nella fruizione, attraverso distanza, accesso, errori e restrizioni. <br>Qui il sistema è sempre più sicuro di quanto dovrebbe: la confidenza dichiarata supera di 15 punti la quota reale, anche con pochi eventi. Una delle etichette è sbagliata di proposito e dichiara comunque una confidenza altissima. Non esiste nessun comando per contestarla.</p>
+
+    <h3>Tecnica</h3>
+    <p>Il ritratto è disegnato in tempo reale da un patch creata in Cables.gl, che istanzia le forme sulla GPU con una camera ortografica. <br> Un modulo JavaScript traduce i dati in array di posizioni, scale e colori. Tutto avviene nel browser: i dati inseriti non vengono inviati a nessun server.</p>
+
+  </div>
+</aside>
+
+<script src="ritratto.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  //  CONFIGURAZIONE 
+  const CONFIG = {
+    nomeProgetto: 'IDENTIKIT',
+    // Percorso dell'export di Cables (es. 'cables/index.html').
+    // Lasciato vuoto = usa l'anteprima 2D di controllo, senza Cables.
+    cablesUrl: 'cables/index.html',
+    datiUrl: 'eventi.json',
+    prefissoVar: 'ritratto_',        // deve coincidere con i nomi delle variabili nel patch
+    opzioni: { formeDisponibili: [0, 2] },
+    apriFormAllAvvio: true           // false = parte subito il ritratto d'esempio
+  };
+
+  const SOTTOTITOLI = {
+    umana: "Ritratto di un'identità digitale.",
+    macchina: 'Profilo generato dal sistema a partire dagli stessi dati.'
+  };
+  const MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
+
+  //  RIFERIMENTI
+  const $ = id => document.getElementById(id);
+  const scena = $('scena'), cv = $('anteprima'), ctx = cv.getContext('2d');
+  const overlay = $('overlay'), frame = $('cables');
+  const btnUmana = $('vista-umana'), btnMacchina = $('vista-macchina');
+  const titolo = $('titolo-testo'), sottotitolo = $('titolo-sub');
+  const riepilogo = $('riepilogo'), firma = $('firma'), stato = $('stato');
+  const grUmana = $('griglia-umana'), grMacchina = $('griglia-macchina');
+
+  let out = null;          // risultato di Ritratto.costruisci
+  let vista = 'umana';
+  let patch = null;        // oggetto patch di Cables (se collegato)
+  let boxes = [];          // elementi DOM dei riquadri
+
+  function mostraStato(msg) {
+    stato.textContent = msg || '';
+    stato.hidden = !msg;
+  }
+
+  //  VIEWPORT (camera ortografica) 
+  // metaAltezza = metà dell'altezza visibile in unità mondo.
+  // Il patch di Cables usa la stessa (la riceve in ritratto_meta_altezza).
+  function viewport() {
+    const larghezza = scena.clientWidth, altezza = scena.clientHeight;
+    const asp = larghezza / altezza;
+    const meta = Math.max(out.estensione.y, out.estensione.x / asp) * 1.15;
+    return { larghezza: larghezza, altezza: altezza, metaAltezza: meta };
+  }
+
+  //  SFONDO: GRIGLIA POLARE 
+  // Disegna il sistema di coordinate del ritratto: anelli = giorni, raggi e tacche = ore.
+  // Usa la stessa proiezione (ellisse + rotazione) dei dati, quindi si allinea alle forme.
+  function disegnaGrigliaSu(canvas, rgb) {
+    const pr = out.proiezione;
+    if (!pr) return;                                   // ritratto.js non aggiornato
+    const dpr = window.devicePixelRatio || 1;
+    const w = scena.clientWidth, h = scena.clientHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    const g = canvas.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+
+    const vp = viewport();
+    const rot = pr.rotGradi * Math.PI / 180, cr = Math.cos(rot), sr = Math.sin(rot);
+    const px = function (theta, r) {                   // theta: 0 = mezzanotte, in alto, senso orario
+      const x = Math.sin(theta) * r * pr.kx, y = Math.cos(theta) * r * pr.ky;
+      return Ritratto.mondoASchermo(x * cr - y * sr, x * sr + y * cr, vp);
+    };
+    const raggioGiorno = function (d) { return pr.raggioMin + (pr.raggio - pr.raggioMin) * (d / pr.giorniFinestra); };
+    const col = function (a) { return 'rgba(' + rgb + ',' + a + ')'; };
+    const linea = function (t0, r0, t1, r1) {
+      const a = px(t0, r0), b = px(t1, r1);
+      g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+    };
+
+    g.lineWidth = 1;
+    // anelli dei giorni (0 = oggi ... 7 = una settimana fa)
+    for (let d = 0; d <= pr.giorniFinestra; d++) {
+      g.strokeStyle = col(d === pr.giorniFinestra ? 0.26 : 0.12);
+      g.beginPath();
+      for (let i = 0; i <= 160; i++) {
+        const p = px(i / 160 * 2 * Math.PI, raggioGiorno(d));
+        if (i === 0) g.moveTo(p.x, p.y); else g.lineTo(p.x, p.y);
+      }
+      g.closePath(); g.stroke();
+    }
+    // raggi ogni 3 ore
+    g.strokeStyle = col(0.08);
+    for (let o = 0; o < 24; o += 3) linea(o / 24 * 2 * Math.PI, pr.raggioMin, o / 24 * 2 * Math.PI, pr.raggio);
+    // tacche orarie sul bordo esterno
+    g.strokeStyle = col(0.34);
+    for (let o = 0; o < 24; o++) {
+      const t = o / 24 * 2 * Math.PI;
+      linea(t, pr.raggio * 1.02, t, pr.raggio * (o % 6 === 0 ? 1.085 : 1.045));
+    }
+    // etichette: ore cardinali e scala dei giorni
+    g.fillStyle = col(0.5);
+    g.font = '11px ' + MONO;
+    g.textBaseline = 'middle';
+    g.textAlign = 'center';
+    ['00', '06', '12', '18'].forEach(function (t, k) {
+      const p = px(k * Math.PI / 2, pr.raggio * 1.15);
+      g.fillText(t, p.x, p.y);
+    });
+    g.textAlign = 'left';
+    const a0 = px(Math.PI, raggioGiorno(0)), a7 = px(Math.PI, raggioGiorno(pr.giorniFinestra));
+    g.fillText('oggi', a0.x + 8, a0.y);
+    g.fillText(pr.giorniFinestra + ' giorni fa', a7.x + 8, a7.y);
+    // croce al centro
+    const c = px(0, 0);
+    g.strokeStyle = col(0.35);
+    g.beginPath(); g.moveTo(c.x - 6, c.y); g.lineTo(c.x + 6, c.y); g.moveTo(c.x, c.y - 6); g.lineTo(c.x, c.y + 6); g.stroke();
+  }
+
+  function disegnaGriglia() {
+    if (!out) return;
+    disegnaGrigliaSu(grUmana, '38,48,66');       // inchiostro scuro su fondo chiaro
+    disegnaGrigliaSu(grMacchina, '57,255,20');   // verde fluo su fondo scuro
+  }
+
+  //  OVERLAY VISTA MACCHINA 
+  function creaOverlay() {
+    overlay.innerHTML = '';
+    // un riquadro per ogni evento classificato dal sistema, con i numeri delle etichette che lo riguardano
+    const indice = {};
+    out.ordineIds.forEach(function (id, i) { indice[id] = i; });
+    const codici = out.ordineIds.map(function () { return []; });
+    out.inferenze.forEach(function (inf, n) {
+      inf.membri.forEach(function (id) { codici[indice[id]].push(n + 1); });
+    });
+    boxes = [];
+    codici.forEach(function (lista, i) {
+      if (!lista.length) return;
+      const box = document.createElement('div');
+      box.className = 'riquadro';
+      box.style.setProperty('--i', boxes.length);
+      const cod = document.createElement('span');
+      cod.className = 'codice';
+      cod.textContent = lista.join(',');
+      box.appendChild(cod);
+      overlay.appendChild(box);
+      boxes.push({ el: box, i: i });
+    });
+
+    riepilogo.innerHTML = '';
+    // legenda: numero, etichetta e confidenza
+    const leg = document.createElement('div');
+    leg.className = 'legenda';
+    out.inferenze.forEach(function (inf, n) {
+      const p = document.createElement('p');
+      const num = document.createElement('span');
+      num.className = 'cod';
+      num.textContent = String(n + 1);
+      const t = document.createElement('span');
+      t.appendChild(document.createTextNode(inf.testo + ' '));
+      const c = document.createElement('b');
+      c.textContent = inf.confidenza + '%';
+      t.appendChild(c);
+      p.appendChild(num);
+      p.appendChild(t);
+      leg.appendChild(p);
+    });
+    riepilogo.appendChild(leg);
+
+    const r1 = document.createElement('p');
+    r1.appendChild(document.createTextNode('campione: ' + out.riepilogo.campione + ' eventi  affidabilità dichiarata: '));
+    const val = document.createElement('b');
+    val.textContent = out.riepilogo.affidabilitaDichiarata + '%';
+    r1.appendChild(val);
+    const r2 = document.createElement('p');
+    const conn = out.cornice.connessioneRilevata ? 'connessione ' + out.cornice.connessione : 'connessione non rilevata';
+    r2.textContent = 'dispositivo: ' + out.cornice.n + ' core, ' + conn + ', lingua ' + out.cornice.firma;
+    riepilogo.appendChild(r1); riepilogo.appendChild(r2);
+    firma.textContent = out.cornice.firma;
+  }
+
+  function posizionaOverlay() {
+    if (!out) return;
+    const vp = viewport();
+    const ppu = vp.altezza / (2 * vp.metaAltezza);        // pixel per unità mondo
+    boxes.forEach(function (b) {
+      const p = Ritratto.mondoASchermo(out.posizioni[b.i * 3], out.posizioni[b.i * 3 + 1], vp);
+      const lato = Math.max(24, out.scale[b.i] * ppu + 16); // diametro della forma + margine
+      b.el.style.left = (p.x - lato / 2) + 'px';
+      b.el.style.top = (p.y - lato / 2) + 'px';
+      b.el.style.width = lato + 'px';
+      b.el.style.height = lato + 'px';
+    });
+  }
+
+  // ANTEPRIMA 2D 
+  function disegnaForma(f, x, y, d, col) {
+    const r = d / 2;
+    ctx.beginPath();
+    switch (f) {
+      case 0: ctx.arc(x, y, r, 0, Math.PI * 2); break;                       // sfera
+      case 1: ctx.rect(x - r, y - r, d, d); break;                           // cubo
+      case 2: ctx.moveTo(x, y - r); ctx.lineTo(x + r, y + r); ctx.lineTo(x - r, y + r); ctx.closePath(); break; // cono
+      case 3: ctx.arc(x, y, r, 0, Math.PI * 2);                              // toro
+              ctx.moveTo(x + r * 0.45, y); ctx.arc(x, y, r * 0.45, 0, Math.PI * 2, true); break;
+      default: ctx.moveTo(x, y + r); ctx.lineTo(x + r, y - r); ctx.lineTo(x - r, y - r); ctx.closePath(); // tetraedro
+    }
+    ctx.fillStyle = col;
+    ctx.fill('evenodd');
+  }
+
+  function rgbDa(arr, i) {
+    return 'rgb(' + [0, 1, 2].map(function (k) { return Math.round(arr[i * 4 + k] * 255); }).join(',') + ')';
+  }
+
+  function disegnaAnteprima() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = scena.clientWidth, h = scena.clientHeight;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const vp = viewport();
+    const ppu = h / (2 * vp.metaAltezza);                       // pixel per unità mondo
+    const P = function (x, y) { return Ritratto.mondoASchermo(x, y, vp); };
+    const m = vista === 'macchina';
+
+    // cornice (anello esterno)
+    const c = out.cornice.punti, cc = m ? out.cornice.coloriMacchina : out.cornice.colori;
+    for (let i = 0; i < c.length / 3; i++) {
+      const p = P(c[i * 3], c[i * 3 + 1]);
+      ctx.beginPath();
+      ctx.fillStyle = rgbDa(cc, i);
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // linee (cubi stirati: lunghezza, angolo, spessore)
+    const L = out.linee, cl = m ? L.coloriMacchina : L.colori;
+    for (let i = 0; i < L.n; i++) {
+      const p = P(L.centri[i * 3], L.centri[i * 3 + 1]);
+      const len = L.lunghezze[i] * ppu;
+      const th = Math.max(1, L.spessori[i] * ppu);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(-L.angoliGradi[i] * Math.PI / 180);            // asse Y dello schermo è invertito
+      ctx.fillStyle = rgbDa(cl, i);
+      ctx.fillRect(-len / 2, -th / 2, len, th);
+      ctx.restore();
+    }
+
+    // forme
+    const cs = m ? out.coloriMacchina : out.colori;
+    for (let i = 0; i < out.n; i++) {
+      const p = P(out.posizioni[i * 3], out.posizioni[i * 3 + 1]);
+      disegnaForma(out.forme[i], p.x, p.y, out.scale[i] * ppu, rgbDa(cs, i));
+    }
+  }
+
+  //  COLLEGAMENTO A CABLES 
+  // Invia (o rinvia) al patch: array, colori della vista attuale, meta_altezza.
+  // Restituisce l'elenco delle variabili non trovate nel patch.
+  function inviaVista() {
+    if (!patch || !out) return [];
+    let mancanti = [];
+    try {
+      mancanti = Ritratto.inviaACables(patch, out, CONFIG.prefissoVar, vista);
+      const nome = CONFIG.prefissoVar + 'meta_altezza';
+      if (!Ritratto.impostaVariabile(patch, nome, viewport().metaAltezza)) mancanti.push(nome);
+    } catch (e) { console.warn('invio a Cables:', e); }
+    return mancanti;
+  }
+
+  function inviaTutto() {
+    const mancanti = inviaVista();
+    if (mancanti.length) console.warn('Variabili non trovate nel patch di Cables:', mancanti);
+  }
+
+  function collegaCables() {
+    frame.hidden = false;
+    frame.src = CONFIG.cablesUrl;
+    let tentativi = 0, invii = 0;
+    const timer = setInterval(function () {
+      tentativi++;
+      try {
+        const p = frame.contentWindow && frame.contentWindow.CABLES && frame.contentWindow.CABLES.patch;
+        if (p && typeof p.setVariable === 'function') {
+          patch = p;
+          inviaTutto();
+          // reinvio qualche volta: il patch potrebbe non aver finito di caricarsi
+          if (++invii >= 4) { clearInterval(timer); mostraStato(''); }
+        }
+      } catch (e) { /* iframe non ancora accessibile */ }
+      if (tentativi > 120) {
+        clearInterval(timer);
+        mostraStato('Il patch di Cables non risponde. Controlla che "' + CONFIG.cablesUrl + '" esista e che la pagina sia aperta da un server locale.');
+      }
+    }, 250);
+  }
+
+  //  VISTA UMANA / MACCHINA 
+  function impostaVista(v) {
+    vista = v;
+    document.body.className = v;
+    sottotitolo.textContent = SOTTOTITOLI[v];
+    btnUmana.setAttribute('aria-pressed', v === 'umana' ? 'true' : 'false');
+    btnMacchina.setAttribute('aria-pressed', v === 'macchina' ? 'true' : 'false');
+    if (out) {
+      inviaVista();
+      if (!CONFIG.cablesUrl) disegnaAnteprima();
+    }
+  }
+
+  btnUmana.addEventListener('click', function () { impostaVista('umana'); });
+  btnMacchina.addEventListener('click', function () { impostaVista('macchina'); });
+
+  let inAttesa = false;
+  window.addEventListener('resize', function () {
+    if (!out || inAttesa) return;
+    inAttesa = true;
+    requestAnimationFrame(function () {
+      inAttesa = false;
+      posizionaOverlay();
+      disegnaGriglia();
+      if (!CONFIG.cablesUrl) disegnaAnteprima();
+      inviaVista();
+    });
+  });
+
+  //  DATI: applica e (ri)costruisci 
+  function applicaDati(dati) {
+    out = Ritratto.costruisci(dati, undefined, CONFIG.opzioni);
+    console.log('Ritratto:', out);      // utile per copiare gli array nell'editor di Cables
+    window.ritratto = out;             // accessibile dalla console: ritratto.perForma[0].posizioni
+    creaOverlay();
+    posizionaOverlay();
+    disegnaGriglia();
+  }
+
+  //  FORM 
+  const formDati = $('form-dati'), righe = $('righe'), conta = $('form-conta');
+  const btnAggiungi = $('aggiungi'), btnGenera = $('genera'), btnApriForm = $('apri-form');
+  const MIN_RIGHE = 5, MAX_RIGHE = 8;
+
+  const ORE = [];
+  for (let i = 0; i < 48; i++) {
+    const h = Math.floor(i / 2);
+    ORE.push([i / 2, (h < 10 ? '0' : '') + h + ':' + (i % 2 ? '30' : '00')]);
+  }
+  const GIORNI = [[0, 'Oggi'], [1, 'Ieri']].concat([2, 3, 4, 5, 6].map(function (n) { return [n, n + ' giorni fa']; }));
+  const LUOGHI = [['casa', 'Casa'], ['scuola_lavoro', 'Scuola o lavoro'], ['viaggio', 'In viaggio'], ['locale', 'In un locale'], ['altro', 'Altrove']];
+  const ATTIVITA = [['social', 'Social'], ['video', 'Video'], ['mappe', 'Mappe'], ['ricerca', 'Ricerche'], ['messaggi', 'Messaggi']];
+  const RIGA_NUOVA = { giorniFa: 0, ora: 12, luogo: 'casa', attivita: 'social' };
+
+  function selezione(nome, opzioni, valore) {
+    const s = document.createElement('select');
+    s.setAttribute('aria-label', nome);
+    opzioni.forEach(function (o) {
+      const op = document.createElement('option');
+      op.value = o[0];
+      op.textContent = o[1];
+      if (String(o[0]) === String(valore)) op.selected = true;
+      s.appendChild(op);
+    });
+    return s;
+  }
+
+  function aggiornaControlli() {
+    const n = righe.children.length;
+    btnAggiungi.disabled = n >= MAX_RIGHE;
+    Array.prototype.forEach.call(righe.querySelectorAll('.togli'), function (b) { b.disabled = n <= MIN_RIGHE; });
+    conta.textContent = n + ' momenti (da ' + MIN_RIGHE + ' a ' + MAX_RIGHE + ')';
+  }
+
+  function creaRiga(e) {
+    const riga = document.createElement('div');
+    riga.className = 'riga';
+    riga.appendChild(selezione('Giorno', GIORNI, e.giorniFa));
+    riga.appendChild(selezione('Ora', ORE, Math.round(e.ora * 2) / 2));
+    riga.appendChild(selezione('Luogo', LUOGHI, e.luogo));
+    riga.appendChild(selezione('Attività', ATTIVITA, e.attivita));
+    const togli = document.createElement('button');
+    togli.type = 'button';
+    togli.className = 'togli';
+    togli.textContent = 'Togli';
+    togli.setAttribute('aria-label', 'Togli questo momento');
+    togli.addEventListener('click', function () {
+      if (righe.children.length > MIN_RIGHE) { righe.removeChild(riga); aggiornaControlli(); }
+    });
+    riga.appendChild(togli);
+    return riga;
+  }
+
+  function riempiForm(eventi) {
+    righe.innerHTML = '';
+    const lista = (eventi || []).slice(0, MAX_RIGHE);
+    while (lista.length < MIN_RIGHE) lista.push(RIGA_NUOVA);
+    lista.forEach(function (e) { righe.appendChild(creaRiga(e)); });
+    aggiornaControlli();
+  }
+
+  function leggiRighe() {
+    return Array.prototype.map.call(righe.children, function (r, i) {
+      const v = r.querySelectorAll('select');
+      return {
+        id: i + 1,
+        giorniFa: parseInt(v[0].value, 10),
+        ora: parseFloat(v[1].value),
+        luogo: v[2].value,
+        attivita: v[3].value
+      };
+    });
+  }
+
+  function apriForm() {
+    formDati.hidden = false;
+    const primo = righe.querySelector('select');
+    if (primo) primo.focus();
+  }
+  function chiudiForm() {
+    formDati.hidden = true;
+    btnApriForm.focus();
+  }
+
+  btnApriForm.addEventListener('click', apriForm);
+  btnAggiungi.addEventListener('click', function () {
+    if (righe.children.length >= MAX_RIGHE) return;
+    righe.appendChild(creaRiga(RIGA_NUOVA));
+    aggiornaControlli();
+  });
+  btnGenera.addEventListener('click', function () {
+    try {
+      applicaDati({ eventi: leggiRighe() });
+    } catch (e) {
+      mostraStato('Non riesco a costruire il ritratto (' + e.message + ').');
+      return;
+    }
+    impostaVista('umana');             // il ritratto compare prima nella vista umana
+    chiudiForm();
+  });
+  formDati.addEventListener('click', function (e) { if (e.target === formDati) chiudiForm(); });
+
+  // ============ DESCRIZIONE DEL PROGETTO ============
+  const info = $('info'), btnInfo = $('apri-info'), btnChiudiInfo = $('chiudi-info');
+  const RIGHE_INFO = [
+    ['Ora del giorno', 'angolo su un orologio di 24 ore, con la mezzanotte in alto'],
+    ['Giorno', 'distanza dal centro: i momenti recenti sono vicini, quelli lontani in periferia'],
+    ['Luogo', CONFIG.opzioni.formaUnica
+      ? 'non cambia la forma, ma alimenta il profilo della vista macchina'
+      : 'forma: sfera, cubo, cono o toro'],
+    ['Attività', 'colore'],
+    ['Ripetizioni', 'dimensione: più un\'abitudine si ripete, più la forma è grande'],
+    ['Sequenza', 'linee che collegano i momenti; più il ritmo è regolare, più la linea è spessa'],
+    ['Core del processore', 'numero di punti dell\'anello esterno'],
+    ['Risoluzione dello schermo', 'proporzioni dell\'anello'],
+    ['Fuso orario', 'rotazione dell\'intero ritratto']
+  ];
+  (function () {
+    const tb = $('info-tabella');
+    RIGHE_INFO.forEach(function (r) {
+      const tr = document.createElement('tr');
+      const th = document.createElement('th'); th.setAttribute('scope', 'row'); th.textContent = r[0];
+      const td = document.createElement('td'); td.textContent = r[1];
+      tr.appendChild(th); tr.appendChild(td); tb.appendChild(tr);
+    });
+  })();
+
+  function apriInfo() { info.hidden = false; btnChiudiInfo.focus(); }
+  function chiudiInfo() { info.hidden = true; btnInfo.focus(); }
+  btnInfo.addEventListener('click', apriInfo);
+  btnChiudiInfo.addEventListener('click', chiudiInfo);
+  info.addEventListener('click', function (e) { if (e.target === info) chiudiInfo(); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!info.hidden) chiudiInfo();
+    else if (!formDati.hidden) chiudiForm();
+  });
+
+  //  AVVIO 
+  async function avvia() {
+    titolo.textContent = CONFIG.nomeProgetto;
+    document.title = CONFIG.nomeProgetto + 'IDENTIKIT — Image as infrastructure';
+    impostaVista('umana');
+    let dati;
+    try {
+      if (!window.Ritratto) throw new Error('ritratto.js non caricato');
+      const r = await fetch(CONFIG.datiUrl);
+      if (!r.ok) throw new Error(CONFIG.datiUrl + ': errore ' + r.status);
+      dati = await r.json();
+      applicaDati(dati);
+    } catch (e) {
+      mostraStato('Non riesco a costruire il ritratto (' + e.message + '). Apri la pagina da un server locale, per esempio http://localhost:8000, non con doppio clic sul file.');
+      return;
+    }
+
+    // Per provare nell'editor di Cables senza esportare: copy(snippetCables())
+    window.snippetCables = function () {
+      return Ritratto.snippetEditor(out, vista, CONFIG.prefissoVar, { meta_altezza: viewport().metaAltezza });
+    };
+    console.log("Editor di Cables: nella console di questa pagina scrivi copy(snippetCables()) e incolla nella console dell'editor.");
+
+    if (CONFIG.cablesUrl) {
+      collegaCables();
+    } else {
+      cv.hidden = false;
+      disegnaAnteprima();
+    }
+    riempiForm(dati.eventi);           // il form parte con i dati d'esempio già compilati
+    impostaVista(vista);
+    if (CONFIG.apriFormAllAvvio) apriForm();
+  }
+
+  avvia();
+})();
+</script>
+</body>
+</html>
